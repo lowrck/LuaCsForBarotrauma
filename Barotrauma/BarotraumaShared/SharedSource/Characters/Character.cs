@@ -27,7 +27,7 @@ namespace Barotrauma
     }
 
     public readonly record struct TalentResistanceIdentifier(Identifier ResistanceIdentifier, Identifier TalentIdentifier);
-
+    [MethodImpl(MethodImplOptions.NoInlining)]
     partial class Character : Entity, IDamageable, ISerializableEntity, IClientSerializable, IServerPositionSync
     {
         public readonly static List<Character> CharacterList = new List<Character>();
@@ -483,7 +483,7 @@ namespace Barotrauma
 
         public LocalizedString TraitorCurrentObjective = "";
         
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        
         public bool IsHuman => SpeciesName == CharacterPrefab.HumanSpeciesName;
 
         private float attackCoolDown;
