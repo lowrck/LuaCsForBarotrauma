@@ -482,6 +482,8 @@ namespace Barotrauma
         }
 
         public LocalizedString TraitorCurrentObjective = "";
+        
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public bool IsHuman => SpeciesName == CharacterPrefab.HumanSpeciesName;
 
         private float attackCoolDown;
