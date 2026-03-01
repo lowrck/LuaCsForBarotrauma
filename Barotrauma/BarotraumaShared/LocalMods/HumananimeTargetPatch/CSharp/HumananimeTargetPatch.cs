@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Collections.Immutable;
 using Barotrauma;
 using HarmonyLib;
 
@@ -26,43 +27,36 @@ namespace HumananimeTargetPatch
     }
 
     [HarmonyPatch]
-    public static class StatusEffectTargetPatch
+    public static class StatusEffectConstructorPatch
     {
         private static readonly Identifier HumanId = "human".ToIdentifier();
         private static readonly Identifier HumananimeId = "humananime".ToIdentifier();
 
-        // IsValidTarget(Character) is protected, so we resolve it by hand.
+        // Cache the FieldInfo so we only pay the reflection cost once.
+        private static readonly FieldInfo TargetIdentifiersField =
+            typeof(StatusEffect).GetField("TargetIdentifiers", BindingFlags.Instance | BindingFlags.Public)
+            ?? throw new Exception("[HumananimeTargetPatch] Could not find StatusEffect.TargetIdentifiers");
+
+        // The constructor is protected, so resolve it via AccessTools.
         static MethodBase TargetMethod() =>
-            typeof(StatusEffect).GetMethod(
-                "IsValidTarget",
-                BindingFlags.Instance | BindingFlags.NonPublic,
-                null,
-                new[] { typeof(Character) },
-                null)
-            ?? throw new Exception("[HumananimeTargetPatch] Could not find StatusEffect.IsValidTarget(Character)");
+            AccessTools.Constructor(typeof(StatusEffect), new[] { typeof(ContentXElement), typeof(string) })
+            ?? throw new Exception("[HumananimeTargetPatch] Could not find StatusEffect(ContentXElement, string)");
 
-        // Runs after the original method. If the effect already accepted the
-        // character we leave the result alone. Otherwise, if "human" is one of
-        // the target identifiers and the character's species is "humananime",
-        // we flip the result to true – replicating the same inside/outside hull
-        // guards the original uses so we never override those constraints.
+        // Runs once per StatusEffect instance, right after the constructor has
+        // parsed and stored TargetIdentifiers. If "human" is in the set we add
+        // "humananime" so every downstream reader of TargetIdentifiers sees it
+        // without any per-call overhead.
         [HarmonyPostfix]
-        static void Postfix(StatusEffect __instance, Character character, ref bool __result)
+        static void Postfix(StatusEffect __instance)
         {
-            if (__result) { return; }
-
-            // Mirror the hull-presence guards from the original method so we
-            // never grant a match that the OnlyInside / OnlyOutside flags forbid.
-            if (__instance.OnlyInside && character.CurrentHull == null) { return; }
-            if (__instance.OnlyOutside && character.CurrentHull != null) { return; }
-
             var ids = __instance.TargetIdentifiers;
             if (ids == null) { return; }
             if (!ids.Contains(HumanId)) { return; }
-            if (character.SpeciesName == HumananimeId)
-            {
-                __result = true;
-            }
+            if (ids.Contains(HumananimeId)) { return; } // already present, nothing to do
+
+            // ImmutableHashSet.Add returns a new set; we then write it back
+            // through reflection because the field is declared readonly.
+            TargetIdentifiersField.SetValue(__instance, ids.Add(HumananimeId));
         }
     }
 }
