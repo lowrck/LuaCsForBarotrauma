@@ -14,6 +14,7 @@ namespace HumananimeTargetPatch
         {
             _harmony = new Harmony("mymods.humananime.targetpatch");
             _harmony.PatchAll(typeof(HumananimePlugin).Assembly);
+            DebugConsole.NewMessage("[HumananimeTargetPatch] Loaded — StatusEffect constructor patched.", Microsoft.Xna.Framework.Color.Cyan);
         }
 
         public void OnLoadCompleted() { }
@@ -46,8 +47,11 @@ namespace HumananimeTargetPatch
         // parsed and stored TargetIdentifiers. If "human" is in the set we add
         // "humananime" so every downstream reader of TargetIdentifiers sees it
         // without any per-call overhead.
+        //
+        // HarmonyX injects named constructor parameters by matching the parameter
+        // name, so parentDebugName arrives here for free.
         [HarmonyPostfix]
-        static void Postfix(StatusEffect __instance)
+        static void Postfix(StatusEffect __instance, string parentDebugName)
         {
             var ids = __instance.TargetIdentifiers;
             if (ids == null) { return; }
@@ -57,6 +61,7 @@ namespace HumananimeTargetPatch
             // ImmutableHashSet.Add returns a new set; we then write it back
             // through reflection because the field is declared readonly.
             TargetIdentifiersField.SetValue(__instance, ids.Add(HumananimeId));
+            DebugConsole.NewMessage($"[HumananimeTargetPatch] Injected 'humananime' into TargetIdentifiers for: {parentDebugName}", Microsoft.Xna.Framework.Color.Cyan);
         }
     }
 }
